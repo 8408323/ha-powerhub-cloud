@@ -33,7 +33,7 @@ Or manually:
 1. Go to **Settings → Devices & Services → Add Integration**.
 2. Search for *PowerHub*.
 3. Choose your energy company.
-4. Scan the BankID QR code that appears with the BankID app.
+4. Sign in with BankID: scan the QR code with the BankID app, or — if Home Assistant is open on the phone that has BankID — tap **Open the BankID app**.
 
 See the **[full setup guide](docs/setup.md) (including the dashboard)** for step-by-step instructions with screenshots.
 
