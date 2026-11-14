@@ -78,7 +78,7 @@ Wait ~30 seconds for Home Assistant to come back online.
 
 ---
 
-## Step 6 — Scan the BankID QR code
+## Step 6 — Sign in with BankID
 
 The integration uses **Swedish BankID** for authentication — the same login as your energy company's PowerHub app.
 
@@ -97,6 +97,8 @@ A QR code is displayed in the dialog:
 > **Note:** The QR code rotates every few seconds. If it expires before you scan it, click **Submit** in the dialog to get a fresh one.
 >
 > **Be patient after approving:** once you approve in BankID, sign-in can take **1–2 minutes** to complete if the servers are slow. Keep clicking **Submit** every few seconds until the dialog closes — do not re-scan.
+
+**Setting up on the phone that has BankID?** You can't scan a QR code on your own screen, so tap **Open the BankID app** at the top of the dialog instead. BankID opens on the same device; approve the login, switch back to Home Assistant and click **Submit**.
 
 ---
 
@@ -152,7 +154,7 @@ The JWT token issued by BankID expires after some time. When it does, Home Assis
 
 ![Re-authentication required notification](images/12_reauth_required_notification.png)
 
-Click the notification and follow the same BankID QR flow to renew your session.
+Click the notification and sign in with BankID again (QR code, or **Open the BankID app** on your phone) to renew your session.
 
 ---
 

@@ -6,6 +6,7 @@ import asyncio
 import logging
 import re
 from typing import Any
+from urllib.parse import quote
 
 import voluptuous as vol
 from homeassistant import config_entries
@@ -34,6 +35,16 @@ _LOGGER = logging.getLogger(__name__)
 SUBMIT_WAIT_ITERATIONS = 10
 SUBMIT_WAIT_INTERVAL = 0.1
 
+# BankID's universal link: opens the BankID app on the device showing the
+# dialog (phone/tablet) for the current order. redirect=null keeps BankID from
+# opening a return URL — the user switches back to Home Assistant themselves.
+BANKID_APP_URL = "https://app.bankid.com/?autostarttoken={token}&redirect=null"
+
+
+def bankid_app_url(auto_start_token: str) -> str:
+    """Same-device BankID link for an order's autoStartToken."""
+    return BANKID_APP_URL.format(token=quote(auto_start_token, safe=""))
+
 
 class PowerHubConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Energy company choice + BankID QR config flow for PowerHub."""
@@ -42,6 +53,7 @@ class PowerHubConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         self._transaction_id: str | None = None
+        self._auto_start_token: str | None = None
         self._qr_code: str | None = None
         self._token: str | None = None
         self._failed: bool = False
@@ -88,10 +100,11 @@ class PowerHubConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._token = None
         self._failed = False
         self._qr_code = None
+        self._auto_start_token = None
 
         session = async_get_clientsession(self.hass)
         try:
-            self._transaction_id, _ = await bankid_start(session, self._provider)
+            self._transaction_id, self._auto_start_token = await bankid_start(session, self._provider)
         except Exception as err:
             _LOGGER.error("Failed to start BankID session: %s", err)
             return self.async_show_form(
@@ -145,6 +158,9 @@ class PowerHubConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._failed = True
 
     def _show_qr_form(self) -> config_entries.ConfigFlowResult:
+        # The QR is for signing on another device; the link opens BankID on this
+        # one. Both belong to the same order, so the background poller picks up
+        # whichever the user signs with.
         return self.async_show_form(
             step_id="bankid_qr",
             data_schema=vol.Schema(
@@ -152,6 +168,7 @@ class PowerHubConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Optional("qr"): QrCodeSelector(QrCodeSelectorConfig(data=self._qr_code or "")),
                 }
             ),
+            description_placeholders={"bankid_url": bankid_app_url(self._auto_start_token or "")},
         )
 
     async def async_step_bankid_qr(self, user_input: dict[str, Any] | None = None) -> config_entries.ConfigFlowResult:

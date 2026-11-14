@@ -13,11 +13,11 @@
       },
       "bankid": {
         "title": "PowerHub",
-        "description": "Logga in med BankID. Tryck Skicka för att visa QR-kod."
+        "description": "Logga in med BankID. Tryck Skicka för att visa QR-koden och länken till BankID på den här enheten."
       },
       "bankid_qr": {
-        "title": "Skanna QR-kod med BankID",
-        "description": "Logga in med Mobilt BankID:\n1. Öppna BankID-appen på din telefon\n2. Tryck **Skicka** för att generera en ny QR-kod\n3. Skanna QR-koden omedelbart med BankID\n4. Godkänn inloggningen i BankID och tryck sedan **Skicka** igen för att slutföra\n\nQR-koden roterar varje sekund — tryck Skicka precis innan du skannar.\n\n**Ha tålamod:** om servrarna är långsamma kan inloggningen ta 1–2 minuter efter godkännandet. Fortsätt trycka Skicka med några sekunders mellanrum tills dialogrutan stängs — skanna inte om."
+        "title": "Logga in med BankID",
+        "description": "**BankID på den här enheten?** [Öppna BankID-appen]({bankid_url}), godkänn inloggningen, gå sedan tillbaka hit och tryck **Skicka**.\n\n**BankID på en annan enhet?** Skanna QR-koden:\n1. Öppna BankID-appen på din telefon\n2. Tryck **Skicka** för att generera en ny QR-kod\n3. Skanna QR-koden omedelbart med BankID\n4. Godkänn inloggningen i BankID och tryck sedan **Skicka** igen för att slutföra\n\nQR-koden roterar varje sekund — tryck Skicka precis innan du skannar.\n\n**Ha tålamod:** om servrarna är långsamma kan inloggningen ta 1–2 minuter efter godkännandet. Fortsätt trycka Skicka med några sekunders mellanrum tills dialogrutan stängs — logga inte in igen."
       }
     },
     "error": {

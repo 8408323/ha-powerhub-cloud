@@ -10,12 +10,14 @@ reloaded, and the flow aborts with reason="reauth_successful".
 from __future__ import annotations
 
 import asyncio
+import json
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant import config_entries
 
 from custom_components.malarenergi_powerhub.api import FacilityInfo
-from custom_components.malarenergi_powerhub.config_flow import PowerHubConfigFlow
+from custom_components.malarenergi_powerhub.config_flow import PowerHubConfigFlow, bankid_app_url
 from custom_components.malarenergi_powerhub.const import CONF_FACILITY_ID, CONF_PROVIDER, CONF_TOKEN
 
 FACILITY = FacilityInfo(
@@ -28,6 +30,7 @@ FACILITY = FacilityInfo(
     customer_id="cust-1",
 )
 NEW_TOKEN = "eyJnew.token.value"
+TRANSLATIONS = Path(__file__).parent.parent / "custom_components" / "malarenergi_powerhub" / "translations"
 OLD_ENTRY_ID = "existing-entry-id"
 
 
@@ -957,6 +960,115 @@ class TestAsyncStepBankidQr:
 
         assert result["type"] == "form"
         assert result["step_id"] == "bankid_qr"
+
+
+# ── same-device BankID link ───────────────────────────────────────────────────
+
+
+class TestBankidSameDevice:
+    def test_app_url_is_bankid_universal_link(self) -> None:
+        assert bankid_app_url("1f2e-3d4c") == "https://app.bankid.com/?autostarttoken=1f2e-3d4c&redirect=null"
+
+    def test_app_url_escapes_token(self) -> None:
+        assert bankid_app_url("a&b=c d") == "https://app.bankid.com/?autostarttoken=a%26b%3Dc%20d&redirect=null"
+
+    async def test_qr_form_carries_link_for_the_started_order(self) -> None:
+        flow = _make_user_flow()
+
+        with (
+            patch("custom_components.malarenergi_powerhub.config_flow.async_get_clientsession"),
+            patch(
+                "custom_components.malarenergi_powerhub.config_flow.bankid_start",
+                AsyncMock(return_value=("txn-123", "auto-token-1")),
+            ),
+            patch(
+                "custom_components.malarenergi_powerhub.config_flow.bankid_poll",
+                _make_async_gen(("pending", "qr-data", None)),
+            ),
+        ):
+            result = await flow.async_step_bankid()
+
+        assert result["step_id"] == "bankid_qr"
+        assert result["description_placeholders"] == {
+            "bankid_url": "https://app.bankid.com/?autostarttoken=auto-token-1&redirect=null"
+        }
+        # The QR (other device) stays alongside the link, and polling keeps running.
+        assert "qr" in result["data_schema"].schema
+        flow.hass.async_create_task.assert_called_once()
+
+    async def test_refreshed_qr_form_keeps_the_link(self) -> None:
+        flow = _make_user_flow()
+        flow._transaction_id = "txn-123"
+        flow._auto_start_token = "auto-token-1"
+        poll_task = MagicMock()
+        poll_task.done.return_value = False
+        flow._poll_task = poll_task
+
+        with patch("asyncio.sleep", AsyncMock()):
+            result = await flow.async_step_bankid_qr()
+
+        assert result["description_placeholders"]["bankid_url"].endswith("autostarttoken=auto-token-1&redirect=null")
+
+    async def test_signing_on_same_device_finishes_on_submit(self) -> None:
+        """Signing in the BankID app on this device is picked up by the poller;
+        the user's Submit on return finishes the flow."""
+        flow = _make_user_flow()
+        flow._transaction_id = "txn-123"
+        flow._auto_start_token = "auto-token-1"
+        flow._poll_task = MagicMock()
+        flow._poll_task.done.return_value = False
+        flow._token = NEW_TOKEN
+        flow._async_finish = AsyncMock(return_value={"type": "create_entry"})
+
+        result = await flow.async_step_bankid_qr()
+
+        flow._async_finish.assert_awaited_once_with(NEW_TOKEN)
+        assert result == {"type": "create_entry"}
+
+    async def test_new_order_gets_a_new_link(self) -> None:
+        flow = _make_user_flow()
+        flow._auto_start_token = "old-token"
+
+        with (
+            patch("custom_components.malarenergi_powerhub.config_flow.async_get_clientsession"),
+            patch(
+                "custom_components.malarenergi_powerhub.config_flow.bankid_start",
+                AsyncMock(return_value=("txn-456", "auto-token-2")),
+            ),
+            patch(
+                "custom_components.malarenergi_powerhub.config_flow.bankid_poll",
+                _make_async_gen(("pending", "qr-data", None)),
+            ),
+        ):
+            result = await flow.async_step_bankid()
+
+        assert "auto-token-2" in result["description_placeholders"]["bankid_url"]
+
+    async def test_reauth_shows_the_link_too(self) -> None:
+        flow = _make_user_flow()
+        flow.context = {"source": config_entries.SOURCE_REAUTH}
+
+        with (
+            patch("custom_components.malarenergi_powerhub.config_flow.async_get_clientsession"),
+            patch(
+                "custom_components.malarenergi_powerhub.config_flow.bankid_start",
+                AsyncMock(return_value=("txn-789", "auto-token-3")),
+            ),
+            patch(
+                "custom_components.malarenergi_powerhub.config_flow.bankid_poll",
+                _make_async_gen(("pending", "qr-data", None)),
+            ),
+        ):
+            result = await flow.async_step_reauth({CONF_PROVIDER: "malarenergi"})
+
+        assert result["step_id"] == "bankid_qr"
+        assert "auto-token-3" in result["description_placeholders"]["bankid_url"]
+
+    def test_every_language_links_the_placeholder(self) -> None:
+        for lang in ("en", "sv"):
+            path = TRANSLATIONS / f"{lang}.json"
+            step = json.loads(path.read_text(encoding="utf-8"))["config"]["step"]["bankid_qr"]
+            assert "]({bankid_url})" in step["description"], lang
 
 
 # ── async_step_reauth ─────────────────────────────────────────────────────────
